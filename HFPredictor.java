@@ -15,6 +15,7 @@ import org.deeplearning4j.arbiter.conf.updater.SgdSpace;
 import org.deeplearning4j.arbiter.data.MnistDataProvider;
 import org.deeplearning4j.arbiter.layers.DenseLayerSpace;
 import org.deeplearning4j.arbiter.layers.OutputLayerSpace;
+import org.deeplearning4j.arbiter.optimize.api.Candidate;
 import org.deeplearning4j.arbiter.optimize.api.OptimizationResult;
 import org.deeplearning4j.arbiter.optimize.api.data.DataProvider;
 import org.deeplearning4j.arbiter.optimize.api.data.DataSource;
@@ -64,6 +65,10 @@ import java.util.concurrent.TimeUnit;
 public class HFPredictor {
     public static void main(String[] args) throws Exception {
 
+
+
+
+        //Input data, defining and applying transformations
         Schema schema = new Schema.Builder()
             .addColumnsDouble("Parameter%d", 0, 11)
             .addColumnCategorical("Death_event", "0", "1")
@@ -80,27 +85,35 @@ public class HFPredictor {
 
         int numLinesToSkip = 1;
         char delimiter = ',';
-        RecordReader reader = new CSVRecordReader(numLinesToSkip, delimiter);
-        reader.initialize(new FileSplit(new File("heart_failure_clinical_records_dataset.csv")));
-        RecordReader transformProcessRecordReader = new TransformProcessRecordReader(reader, transformProcess);
+        RecordReader trainR = new CSVRecordReader(numLinesToSkip, delimiter);
+        trainR.initialize(new FileSplit(new File("heart_failure_clinical_records_dataset_train.csv")));
+        RecordReader transformProcessRecordReaderTrain = new TransformProcessRecordReader(trainR, transformProcess);
+
+        RecordReader testR = new CSVRecordReader(numLinesToSkip, delimiter);
+        testR.initialize(new FileSplit(new File("heart_failure_clinical_records_dataset_test.csv")));
+        RecordReader transformProcessRecordReaderTest = new TransformProcessRecordReader(testR, transformProcess);
 
 
         int labelIndex = 2;
         int numClasses = 2;
-        int batchSize = 299;
+        int TrainbatchSize = 219;
+        int TestbatchSize = 80;
+        DataSetIterator TrainIterator = new RecordReaderDataSetIterator(transformProcessRecordReaderTrain, TrainbatchSize, labelIndex, numClasses);
+        DataSetIterator TestIterator = new RecordReaderDataSetIterator(transformProcessRecordReaderTest, TestbatchSize, labelIndex, numClasses);
 
-        DataSetIterator iterator = new RecordReaderDataSetIterator(transformProcessRecordReader, batchSize, labelIndex, numClasses);
-        DataSet allData = iterator.next();
+
+        // normalization
+
+        DataNormalization dataNormalization = new NormalizerStandardize();
+        dataNormalization.fit(TrainIterator);
+        TrainIterator.setPreProcessor(dataNormalization);
+        TestIterator.setPreProcessor(dataNormalization);
+
+        /* DataSet allData = iterator.next();
         allData.shuffle();
-        SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(0.7);  //Use 70% of data for training
+        SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(0.7);  //Use 70% of data for training */
 
-        DataSet trainingData = testAndTrain.getTrain();
-        DataSet testData = testAndTrain.getTest();
-
-        DataNormalization normalizer = new NormalizerStandardize();
-        normalizer.fit(trainingData);
-        normalizer.transform(trainingData);
-        normalizer.transform(testData);
+        DataSet trainingData = TrainIterator.next();
 
         ContinuousParameterSpace learningRateHyperparam = new ContinuousParameterSpace(0.0001, 0.1);
         IntegerParameterSpace layerSizeHyperparam = new IntegerParameterSpace(2, 100);
@@ -135,11 +148,12 @@ public class HFPredictor {
                 .build())
             .build();
 
-        MnistDataProvider dataProvider = new MnistDataProvider(1, batchSize); //da rimuovere, solo prova
+        MnistDataProvider dataProvider = new MnistDataProvider(2, 1000); //da rimuovere, solo prova
 
         RandomSearchGenerator candidateGenerator = new RandomSearchGenerator(hyperparameterSpace, null);
         DataSourceCustom dt = new DataSourceCustom();
         dt.settrainData(trainingData);
+        dt.setTrainIterator(TrainIterator);
 
         OptimizationConfiguration configuration = new OptimizationConfiguration.Builder()
             .candidateGenerator(candidateGenerator)
@@ -158,7 +172,6 @@ public class HFPredictor {
         List<ResultReference> allResults = runner.getResults();
 
         OptimizationResult bestResult = allResults.get(indexOfBestResult).getResult();
-        //MultiLayerNetwork bestModel = bestResult.;
 
 
         System.out.println("\n\nConfiguration of best model:\n");
@@ -173,6 +186,8 @@ public class HFPredictor {
 
         String path= "arbiterExample/34";
 
+        /*
+
         MultiLayerNetwork model= ModelSerializer.restoreMultiLayerNetwork(path);
 
 
@@ -181,11 +196,8 @@ public class HFPredictor {
         model.setListeners(new ScoreIterationListener(100));
 
         DataSetIterator kFoldIterator = new KFoldIterator(trainingData);
-        model.fit(kFoldIterator, 100);
+        model.fit(kFoldIterator, 100); */
 
-        Evaluation eval = new Evaluation(2);
-        INDArray output = model.output(testData.getFeatures());
-        eval.eval(testData.getLabels(), output);
 
 
 

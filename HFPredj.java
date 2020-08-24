@@ -1,6 +1,7 @@
 package org.deeplearning4j.examples;
 
 import org.deeplearning4j.datasets.iterator.DataSetIteratorSplitter;
+import org.deeplearning4j.earlystopping.EarlyStoppingResult;
 import org.deeplearning4j.eval.ROC;
 import org.apache.commons.io.FilenameUtils;
 import org.datavec.api.records.reader.RecordReader;
@@ -41,13 +42,9 @@ import java.util.concurrent.TimeUnit;
 public class HFPredj {
     public static void main(String[] args) throws Exception{
 
-        String  tempDir= System.getProperty("java.io.tmpdir");
-        String exampleDirectory = FilenameUtils.concat(tempDir, "DL4JEarlyStoppingExample/");
-        File dirFile  = new File(exampleDirectory);
-        dirFile.mkdir();
 
-        LocalFileModelSaver saver  = new LocalFileModelSaver(exampleDirectory);
 
+        //Input data, defining and applying transformations
         Schema schema = new Schema.Builder()
             .addColumnsDouble("Parameter%d", 0, 11)
             .addColumnCategorical("Death_event", "0", "1")
@@ -80,24 +77,22 @@ public class HFPredj {
         DataSetIterator TrainIterator = new RecordReaderDataSetIterator(transformProcessRecordReaderTrain, TrainbatchSize, labelIndex, numClasses);
         DataSetIterator TestIterator = new RecordReaderDataSetIterator(transformProcessRecordReaderTest, TestbatchSize, labelIndex, numClasses);
 
+
+        // normalization
+
         DataNormalization dataNormalization = new NormalizerStandardize();
         dataNormalization.fit(TrainIterator);
         TrainIterator.setPreProcessor(dataNormalization);
         TestIterator.setPreProcessor(dataNormalization);
 
-
-
         /* DataSet allData = iterator.next();
         allData.shuffle();
-        SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(0.7);  //Use 70% of data for training
+        SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(0.7);  //Use 70% of data for training */
 
-        DataSet trainingData = testAndTrain.getTrain();
-        DataSet testData = testAndTrain.getTest();
+        DataSet trainingData = TrainIterator.next();
 
-        DataNormalization normalizer = new NormalizerStandardize();
-        normalizer.fit(trainingData);
-        normalizer.transform(trainingData);
-        normalizer.transform(testData); */
+
+//Neural Network
 
         long seed = 6;
 
@@ -118,30 +113,48 @@ public class HFPredj {
             .build();
 
 
-       /* EarlyStoppingConfiguration esConf  = new EarlyStoppingConfiguration.Builder()
-            .epochTerminationConditions(new MaxEpochsTerminationCondition(10))
+        //Training with early stopping
+
+        String  tempDir= System.getProperty("java.io.tmpdir");
+        String exampleDirectory = FilenameUtils.concat(tempDir, "DL4JEarlyStoppingExample/");
+        File dirFile  = new File(exampleDirectory);
+        dirFile.mkdir();
+
+        LocalFileModelSaver saver  = new LocalFileModelSaver(exampleDirectory);
+
+        EarlyStoppingConfiguration esConf  = new EarlyStoppingConfiguration.Builder()
+            .epochTerminationConditions(new MaxEpochsTerminationCondition(1000))
             .iterationTerminationConditions(new MaxTimeIterationTerminationCondition(5, TimeUnit.MINUTES))
-            .scoreCalculator(new DataSetLossCalculator(splitter.getTestIterator(), true))
-            .evaluateEveryNEpochs(1)
+            .scoreCalculator(new DataSetLossCalculator(TestIterator, true))
+            .evaluateEveryNEpochs(10)
             .modelSaver(saver)
             .build();
 
-        EarlyStoppingTrainer trainer  = new EarlyStoppingTrainer(esConf,conf,splitter.getTrainIterator());
-        trainer.fit(); */
+        KFoldIterator cross= new KFoldIterator(trainingData); //K=10
 
-        //run the model
-        MultiLayerNetwork model = new MultiLayerNetwork(conf);
+        EarlyStoppingTrainer trainer  = new EarlyStoppingTrainer(esConf,conf,cross);
+        EarlyStoppingResult<MultiLayerNetwork> result=trainer.fit();
+
+        System.out.println("Termination reason: " + result.getTerminationReason());
+        System.out.println("Termination details: " + result.getTerminationDetails());
+        System.out.println("Total epochs: " + result.getTotalEpochs());
+        System.out.println("Best epoch number: " + result.getBestModelEpoch());
+        System.out.println("Score at best epoch: " + result.getBestModelScore());
+
+        MultiLayerNetwork model =result.getBestModel();
         model.init();
 
-        model.setListeners(new ScoreIterationListener(20));
+       /* model.setListeners(new ScoreIterationListener(20));
 
-        model.fit(TrainIterator,10);
+        model.fit(TrainIterator,10);  */
+
         /* Evaluation eval = new Evaluation(2);
         INDArray output = model.output(testData.getFeatures());
         eval.eval(testData.getLabels(), output); */
 
-        Evaluation eval = model.evaluate(TestIterator);
+        //Evaluation
 
+        Evaluation eval = model.evaluate(TestIterator);
         System.out.println(eval.stats());
 
         model.evaluateROC(TestIterator, 100);
