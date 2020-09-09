@@ -27,6 +27,7 @@ import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
 import org.nd4j.linalg.dataset.api.iterator.KFoldIterator;
 import org.nd4j.linalg.dataset.api.preprocessor.DataNormalization;
 import org.nd4j.linalg.dataset.api.preprocessor.NormalizerStandardize;
+import org.nd4j.linalg.learning.config.Nesterovs;
 import org.nd4j.linalg.learning.config.Sgd;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 import org.deeplearning4j.earlystopping.EarlyStoppingConfiguration;
@@ -96,20 +97,25 @@ public class HFPredj {
 
         long seed = 6;
 
-        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
+
+       MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
             .seed(seed)
-            .activation(Activation.TANH)
             .weightInit(WeightInit.XAVIER)
             .updater(new Sgd(0.1))
             .l2(1e-4)
             .list()
-            .layer(new DenseLayer.Builder().nIn(labelIndex).nOut(3)
+            .layer(new DenseLayer.Builder().nIn(labelIndex).nOut(4)
+                .activation(Activation.TANH)
                 .build())
-            .layer(new DenseLayer.Builder().nIn(3).nOut(3)
+           .layer(new DenseLayer.Builder().nIn(4).nOut(14)
+                    .activation(Activation.RELU)
+                    .build())
+            .layer(new DenseLayer.Builder().nIn(14).nOut(4)
+                .activation(Activation.RELU)
                 .build())
             .layer(new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
                 .activation(Activation.SOFTMAX)
-                .nIn(3).nOut(numClasses).build())
+                .nIn(4).nOut(numClasses).build())
             .build();
 
 
@@ -126,7 +132,7 @@ public class HFPredj {
             .epochTerminationConditions(new MaxEpochsTerminationCondition(1000))
             .iterationTerminationConditions(new MaxTimeIterationTerminationCondition(5, TimeUnit.MINUTES))
             .scoreCalculator(new DataSetLossCalculator(TestIterator, true))
-            .evaluateEveryNEpochs(10)
+            .evaluateEveryNEpochs(1)
             .modelSaver(saver)
             .build();
 
