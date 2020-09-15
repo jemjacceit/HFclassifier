@@ -6,10 +6,7 @@ import org.deeplearning4j.eval.ROC;
 import org.apache.commons.io.FilenameUtils;
 import org.datavec.api.records.reader.RecordReader;
 import org.datavec.api.records.reader.impl.csv.CSVRecordReader;
-import org.datavec.api.records.reader.impl.transform.TransformProcessRecordReader;
 import org.datavec.api.split.FileSplit;
-import org.datavec.api.transform.TransformProcess;
-import org.datavec.api.transform.schema.Schema;
 import org.deeplearning4j.datasets.datavec.RecordReaderDataSetIterator;
 import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
@@ -40,43 +37,25 @@ import org.deeplearning4j.earlystopping.trainer.EarlyStoppingTrainer;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 
-public class HFPredj {
+public class HFPredictor {
     public static void main(String[] args) throws Exception{
-
-
-
-        //Input data, defining and applying transformations
-        Schema schema = new Schema.Builder()
-            .addColumnsDouble("Parameter%d", 0, 11)
-            .addColumnCategorical("Death_event", "0", "1")
-            .build();
-
-
-        TransformProcess transformProcess = new TransformProcess.Builder(schema)
-            .removeAllColumnsExceptFor("Parameter4", "Parameter7", "Death_event")
-            .renameColumn("Parameter4", "Ejection fraction")
-            .renameColumn("Parameter7", "Serum creatinine")
-            .categoricalToInteger("Death_event")
-            .build();
 
 
         int numLinesToSkip = 1;
         char delimiter = ',';
         RecordReader trainR = new CSVRecordReader(numLinesToSkip, delimiter);
         trainR.initialize(new FileSplit(new File("heart_failure_clinical_records_dataset_train.csv")));
-        RecordReader transformProcessRecordReaderTrain = new TransformProcessRecordReader(trainR, transformProcess);
 
         RecordReader testR = new CSVRecordReader(numLinesToSkip, delimiter);
         testR.initialize(new FileSplit(new File("heart_failure_clinical_records_dataset_test.csv")));
-        RecordReader transformProcessRecordReaderTest = new TransformProcessRecordReader(testR, transformProcess);
 
 
-        int labelIndex = 2;
+        int labelIndex = 12;
         int numClasses = 2;
         int TrainbatchSize = 219;
         int TestbatchSize = 80;
-        DataSetIterator TrainIterator = new RecordReaderDataSetIterator(transformProcessRecordReaderTrain, TrainbatchSize, labelIndex, numClasses);
-        DataSetIterator TestIterator = new RecordReaderDataSetIterator(transformProcessRecordReaderTest, TestbatchSize, labelIndex, numClasses);
+        DataSetIterator TrainIterator = new RecordReaderDataSetIterator(trainR, TrainbatchSize, labelIndex, numClasses);
+        DataSetIterator TestIterator = new RecordReaderDataSetIterator(testR, TestbatchSize, labelIndex, numClasses);
 
 
         // normalization
@@ -98,25 +77,25 @@ public class HFPredj {
         long seed = 6;
 
 
-            MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
-                .seed(seed)
-                .weightInit(WeightInit.XAVIER)
-                .updater(new Sgd(0.1))
-                .l2(1e-4)
-                .list()
-                .layer(new DenseLayer.Builder().nIn(labelIndex).nOut(4)
-                    .activation(Activation.TANH)
-                    .build())
-                .layer(new DenseLayer.Builder().nIn(4).nOut(14)
-                    .activation(Activation.RELU)
-                    .build())
-                .layer(new DenseLayer.Builder().nIn(14).nOut(4)
-                    .activation(Activation.RELU)
-                    .build())
-                .layer(new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
-                    .activation(Activation.SOFTMAX)
-                    .nIn(4).nOut(numClasses).build())
-                .build();
+        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
+            .seed(seed)
+            .weightInit(WeightInit.XAVIER)
+            .updater(new Sgd(0.1))
+            .l2(1e-4)
+            .list()
+            .layer(new DenseLayer.Builder().nIn(labelIndex).nOut(4)
+                .activation(Activation.TANH)
+                .build())
+            .layer(new DenseLayer.Builder().nIn(4).nOut(14)
+                .activation(Activation.RELU)
+                .build())
+            .layer(new DenseLayer.Builder().nIn(14).nOut(4)
+                .activation(Activation.RELU)
+                .build())
+            .layer(new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
+                .activation(Activation.SOFTMAX)
+                .nIn(4).nOut(numClasses).build())
+            .build();
 
 
 
