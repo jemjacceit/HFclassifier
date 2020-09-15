@@ -65,17 +65,9 @@ public class HFPredictor {
         TrainIterator.setPreProcessor(dataNormalization);
         TestIterator.setPreProcessor(dataNormalization);
 
-        /* DataSet allData = iterator.next();
-        allData.shuffle();
-        SplitTestAndTrain testAndTrain = allData.splitTestAndTrain(0.7);  //Use 70% of data for training */
-
-        // DataSet trainingData = TrainIterator.next();
-
-
-//Neural Network
+        //Neural Network
 
         long seed = 6;
-
 
         MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
             .seed(seed)
@@ -98,7 +90,6 @@ public class HFPredictor {
             .build();
 
 
-
         //Training with early stopping
 
         String  tempDir= System.getProperty("java.io.tmpdir");
@@ -110,13 +101,12 @@ public class HFPredictor {
 
         EarlyStoppingConfiguration esConf  = new EarlyStoppingConfiguration.Builder()
             .epochTerminationConditions(new MaxEpochsTerminationCondition(1000))
-            .iterationTerminationConditions(new MaxTimeIterationTerminationCondition(5, TimeUnit.MINUTES))
+            .iterationTerminationConditions(new MaxTimeIterationTerminationCondition(10, TimeUnit.MINUTES))
             .scoreCalculator(new DataSetLossCalculator(TestIterator, true))
             .evaluateEveryNEpochs(1)
             .modelSaver(saver)
             .build();
 
-        // KFoldIterator cross= new KFoldIterator(trainingData); //K=10
 
         EarlyStoppingTrainer trainer  = new EarlyStoppingTrainer(esConf,conf,TrainIterator);
         EarlyStoppingResult<MultiLayerNetwork> result=trainer.fit();
@@ -127,16 +117,8 @@ public class HFPredictor {
         System.out.println("Best epoch number: " + result.getBestModelEpoch());
         System.out.println("Score at best epoch: " + result.getBestModelScore());
 
+
         MultiLayerNetwork model =result.getBestModel();
-        model.init();
-
-       /* model.setListeners(new ScoreIterationListener(20));
-
-        model.fit(TrainIterator,10);  */
-
-        /* Evaluation eval = new Evaluation(2);
-        INDArray output = model.output(testData.getFeatures());
-        eval.eval(testData.getLabels(), output); */
 
         //Evaluation
 
