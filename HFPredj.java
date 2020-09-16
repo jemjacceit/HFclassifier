@@ -44,7 +44,8 @@ public class HFPredj {
     public static void main(String[] args) throws Exception{
 
 
-        //Input data, defining and applying transformations
+        //Defining transformations
+
         Schema schema = new Schema.Builder()
             .addColumnsDouble("Parameter%d", 0, 11)
             .addColumnCategorical("Death_event", "0", "1")
@@ -89,9 +90,11 @@ public class HFPredj {
         // DataSet trainingData = TrainIterator.next();
 
 
-        //Neural Network
+
 
         long seed = 6;
+
+        //ANN configuration
 
             MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
                 .seed(seed)
@@ -108,8 +111,8 @@ public class HFPredj {
                 .layer(new DenseLayer.Builder().nIn(14).nOut(4)
                     .activation(Activation.RELU)
                     .build())
-                .layer(new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
-                    .activation(Activation.SOFTMAX)
+                .layer(new OutputLayer.Builder(LossFunctions.LossFunction.SQUARED_LOSS)
+                    .activation(Activation.SIGMOID)
                     .nIn(4).nOut(numClasses).build())
                 .build();
 
@@ -125,13 +128,12 @@ public class HFPredj {
         LocalFileModelSaver saver  = new LocalFileModelSaver(exampleDirectory);
 
         EarlyStoppingConfiguration esConf  = new EarlyStoppingConfiguration.Builder()
-            .epochTerminationConditions(new MaxEpochsTerminationCondition(1000))
+            .epochTerminationConditions(new MaxEpochsTerminationCondition(5000))
             .iterationTerminationConditions(new MaxTimeIterationTerminationCondition(10, TimeUnit.MINUTES))
             .scoreCalculator(new DataSetLossCalculator(TestIterator, true))
             .evaluateEveryNEpochs(1)
             .modelSaver(saver)
             .build();
-
 
         EarlyStoppingTrainer trainer  = new EarlyStoppingTrainer(esConf,conf,TrainIterator);
         EarlyStoppingResult<MultiLayerNetwork> result=trainer.fit();

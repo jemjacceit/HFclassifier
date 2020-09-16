@@ -84,8 +84,8 @@ public class HFPredictor {
             .layer(new DenseLayer.Builder().nIn(14).nOut(4)
                 .activation(Activation.RELU)
                 .build())
-            .layer(new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
-                .activation(Activation.SOFTMAX)
+            .layer(new OutputLayer.Builder(LossFunctions.LossFunction.SQUARED_LOSS)
+                .activation(Activation.SIGMOID)
                 .nIn(4).nOut(numClasses).build())
             .build();
 
@@ -100,7 +100,7 @@ public class HFPredictor {
         LocalFileModelSaver saver  = new LocalFileModelSaver(exampleDirectory);
 
         EarlyStoppingConfiguration esConf  = new EarlyStoppingConfiguration.Builder()
-            .epochTerminationConditions(new MaxEpochsTerminationCondition(1000))
+            .epochTerminationConditions(new MaxEpochsTerminationCondition(5000))
             .iterationTerminationConditions(new MaxTimeIterationTerminationCondition(10, TimeUnit.MINUTES))
             .scoreCalculator(new DataSetLossCalculator(TestIterator, true))
             .evaluateEveryNEpochs(1)
