@@ -2,6 +2,7 @@ package org.deeplearning4j.examples;
 
 import org.deeplearning4j.datasets.iterator.DataSetIteratorSplitter;
 import org.deeplearning4j.earlystopping.EarlyStoppingResult;
+import org.deeplearning4j.earlystopping.termination.ScoreImprovementEpochTerminationCondition;
 import org.deeplearning4j.eval.ROC;
 import org.apache.commons.io.FilenameUtils;
 import org.datavec.api.records.reader.RecordReader;
@@ -52,8 +53,8 @@ public class HFPredictor {
 
         int labelIndex = 12;
         int numClasses = 2;
-        int TrainbatchSize = 219;
-        int TestbatchSize = 80;
+        int TrainbatchSize = 166;
+        int TestbatchSize = 133;
         DataSetIterator TrainIterator = new RecordReaderDataSetIterator(trainR, TrainbatchSize, labelIndex, numClasses);
         DataSetIterator TestIterator = new RecordReaderDataSetIterator(testR, TestbatchSize, labelIndex, numClasses);
 
@@ -99,14 +100,13 @@ public class HFPredictor {
 
         LocalFileModelSaver saver  = new LocalFileModelSaver(exampleDirectory);
 
-        EarlyStoppingConfiguration esConf  = new EarlyStoppingConfiguration.Builder()
-            .epochTerminationConditions(new MaxEpochsTerminationCondition(5000))
+        EarlyStoppingConfiguration esConf = new EarlyStoppingConfiguration.Builder()
+            .epochTerminationConditions(new MaxEpochsTerminationCondition(5000),
+                new ScoreImprovementEpochTerminationCondition(100))
             .iterationTerminationConditions(new MaxTimeIterationTerminationCondition(10, TimeUnit.MINUTES))
             .scoreCalculator(new DataSetLossCalculator(TestIterator, true))
             .evaluateEveryNEpochs(1)
-            .modelSaver(saver)
             .build();
-
 
         EarlyStoppingTrainer trainer  = new EarlyStoppingTrainer(esConf,conf,TrainIterator);
         EarlyStoppingResult<MultiLayerNetwork> result=trainer.fit();
@@ -125,7 +125,7 @@ public class HFPredictor {
         Evaluation eval = model.evaluate(TestIterator);
         System.out.println(eval.stats());
 
-        System.out.println(model.evaluateROC(TestIterator, 100).calculateAUC());
+        System.out.println("Area under the curve is " +model.evaluateROC(TestIterator, 100).calculateAUC());
 
     }
 }

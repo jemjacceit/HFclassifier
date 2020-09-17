@@ -2,6 +2,7 @@ package org.deeplearning4j.examples;
 
 import org.deeplearning4j.datasets.iterator.DataSetIteratorSplitter;
 import org.deeplearning4j.earlystopping.EarlyStoppingResult;
+import org.deeplearning4j.earlystopping.termination.ScoreImprovementEpochTerminationCondition;
 import org.deeplearning4j.eval.ROC;
 import org.apache.commons.io.FilenameUtils;
 import org.datavec.api.records.reader.RecordReader;
@@ -73,10 +74,12 @@ public class HFPredj {
 
         int labelIndex = 2;
         int numClasses = 2;
-        int TrainbatchSize = 219;
-        int TestbatchSize = 80;
-        DataSetIterator TrainIterator = new RecordReaderDataSetIterator(transformProcessRecordReaderTrain, TrainbatchSize, labelIndex, numClasses);
-        DataSetIterator TestIterator = new RecordReaderDataSetIterator(transformProcessRecordReaderTest, TestbatchSize, labelIndex, numClasses);
+        int TrainbatchSize = 166;
+        int TestbatchSize = 133;
+        DataSetIterator TrainIterator = new RecordReaderDataSetIterator(transformProcessRecordReaderTrain,
+            TrainbatchSize, labelIndex, numClasses);
+        DataSetIterator TestIterator = new RecordReaderDataSetIterator(transformProcessRecordReaderTest,
+            TestbatchSize, labelIndex, numClasses);
 
 
         // normalization
@@ -127,13 +130,14 @@ public class HFPredj {
 
         LocalFileModelSaver saver  = new LocalFileModelSaver(exampleDirectory);
 
-        EarlyStoppingConfiguration esConf  = new EarlyStoppingConfiguration.Builder()
-            .epochTerminationConditions(new MaxEpochsTerminationCondition(5000))
-            .iterationTerminationConditions(new MaxTimeIterationTerminationCondition(10, TimeUnit.MINUTES))
+        EarlyStoppingConfiguration esConf = new EarlyStoppingConfiguration.Builder()
+            .epochTerminationConditions(new MaxEpochsTerminationCondition(5000),
+                new ScoreImprovementEpochTerminationCondition(100))
+            .iterationTerminationConditions(new MaxTimeIterationTerminationCondition(10,
+                TimeUnit.MINUTES))
             .scoreCalculator(new DataSetLossCalculator(TestIterator, true))
-            .evaluateEveryNEpochs(1)
-            .modelSaver(saver)
-            .build();
+                .evaluateEveryNEpochs(1)
+                .build();
 
         EarlyStoppingTrainer trainer  = new EarlyStoppingTrainer(esConf,conf,TrainIterator);
         EarlyStoppingResult<MultiLayerNetwork> result=trainer.fit();
@@ -153,7 +157,8 @@ public class HFPredj {
         Evaluation eval = model.evaluate(TestIterator);
         System.out.println(eval.stats());
 
-        System.out.println(model.evaluateROC(TestIterator, 100).calculateAUC());
+        System.out.println("Area under the curve is " +model.evaluateROC(TestIterator, 100).calculateAUC());
+
 
     }
 }
